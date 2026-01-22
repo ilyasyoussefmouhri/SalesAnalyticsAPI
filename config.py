@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = "INFO"
     
+    # File Upload Configuration
+    # SECURITY: Maximum file size in bytes to prevent DoS attacks via large file uploads
+    # Default: 10MB (10 * 1024 * 1024 bytes)
+    # Adjust based on your needs, but keep reasonable limits for security
+    max_file_size: int = 10 * 1024 * 1024  # 10MB default
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

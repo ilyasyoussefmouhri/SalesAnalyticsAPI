@@ -7,12 +7,40 @@ from fastapi import UploadFile, HTTPException
 logger = logging.getLogger(__name__)
 
 
-def read_csv_file(file: UploadFile) -> pd.DataFrame:
-    """Read and parse CSV file from upload."""
+def read_csv_file(file: UploadFile, max_size: int) -> pd.DataFrame:
+    """Read and parse CSV file from upload.
+    
+    Args:
+        file: Uploaded file object
+        max_size: Maximum allowed file size in bytes
+        
+    Returns:
+        Parsed pandas DataFrame
+        
+    Raises:
+        HTTPException: If file size exceeds limit or reading fails
+    """
+    # SECURITY: Validate file size before reading into memory to prevent DoS attacks
+    if file.size and file.size > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+        )
+    
     try:
         contents = file.file.read()
+        
+        # Additional check: validate actual content size (file.size might be None)
+        if len(contents) > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File size ({len(contents)} bytes) exceeds maximum allowed size ({max_size} bytes)"
+            )
+        
         df = pd.read_csv(BytesIO(contents))
         return df
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error reading CSV file: {str(e)}")
         raise HTTPException(
@@ -24,7 +52,20 @@ def read_csv_file(file: UploadFile) -> pd.DataFrame:
 
 
 def validate_sales_data(df: pd.DataFrame) -> dict:
-    """Validate sales data quality and return validation results."""
+    """Validate sales data quality and return validation results.
+    
+    Note: Works on a copy of the DataFrame to avoid side effects.
+    
+    Args:
+        df: Input DataFrame to validate
+        
+    Returns:
+        Dictionary with validation results (valid, errors, warnings, stats)
+    """
+    # SECURITY: Work on a copy to avoid mutating the input DataFrame
+    # This prevents side effects and unexpected behavior
+    df = df.copy()
+    
     validation_results = {
         "valid": True,
         "errors": [],
@@ -58,7 +99,7 @@ def validate_sales_data(df: pd.DataFrame) -> dict:
                     f"Column '{col}' has {count} missing values"
                 )
     
-    # Validate data types
+    # Validate data types (working on copy, so mutations are safe)
     if "quantity" in df.columns:
         try:
             df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
@@ -109,7 +150,19 @@ def validate_sales_data(df: pd.DataFrame) -> dict:
 
 
 def calculate_sales_analytics(df: pd.DataFrame) -> dict:
-    """Calculate comprehensive sales analytics."""
+    """Calculate comprehensive sales analytics.
+    
+    Note: Works on a copy of the DataFrame to avoid side effects.
+    
+    Args:
+        df: Input DataFrame with sales data
+        
+    Returns:
+        Dictionary with comprehensive sales analytics
+    """
+    # SECURITY: Work on a copy to avoid mutating the input DataFrame
+    df = df.copy()
+    
     # Ensure numeric columns
     df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce")
     df["price"] = pd.to_numeric(df["price"], errors="coerce")

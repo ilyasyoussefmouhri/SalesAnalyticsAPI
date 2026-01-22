@@ -57,6 +57,13 @@ async def quick_stats(
     """Get quick statistics about the uploaded file."""
     logger.info(f"Quick stats requested for file: {file.filename}")
     
+    # SECURITY: Validate file size before processing to prevent DoS attacks
+    if file.size and file.size > settings.max_file_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
+        )
+    
     # Validate file type
     if not file.filename.endswith('.csv'):
         raise HTTPException(
@@ -65,7 +72,7 @@ async def quick_stats(
         )
     
     try:
-        df = read_csv_file(file)
+        df = read_csv_file(file, settings.max_file_size)
         
         return QuickStatsResponse(
             filename=file.filename,
@@ -94,6 +101,13 @@ async def validate_data(
     """Validate data quality of the uploaded sales file."""
     logger.info(f"Validation requested for file: {file.filename}")
     
+    # SECURITY: Validate file size before processing to prevent DoS attacks
+    if file.size and file.size > settings.max_file_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
+        )
+    
     # Validate file type
     if not file.filename.endswith('.csv'):
         raise HTTPException(
@@ -102,7 +116,7 @@ async def validate_data(
         )
     
     try:
-        df = read_csv_file(file)
+        df = read_csv_file(file, settings.max_file_size)
         validation_results = validate_sales_data(df)
         
         return ValidateResponse(
@@ -128,6 +142,13 @@ async def analyze_sales(
     """Perform full sales analysis on the uploaded file."""
     logger.info(f"Full analysis requested for file: {file.filename}")
     
+    # SECURITY: Validate file size before processing to prevent DoS attacks
+    if file.size and file.size > settings.max_file_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
+        )
+    
     # Validate file type
     if not file.filename.endswith('.csv'):
         raise HTTPException(
@@ -136,7 +157,7 @@ async def analyze_sales(
         )
     
     try:
-        df = read_csv_file(file)
+        df = read_csv_file(file, settings.max_file_size)
         
         # First validate the data
         validation_results = validate_sales_data(df)
