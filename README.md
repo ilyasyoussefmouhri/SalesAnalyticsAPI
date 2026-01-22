@@ -2,6 +2,8 @@
 
 A comprehensive FastAPI application for analyzing sales data with data validation, quality checks, and detailed analytics.
 
+**Repository**: [https://github.com/ilyasyoussefmouhri/SalesAnalyticsAPI](https://github.com/ilyasyoussefmouhri/SalesAnalyticsAPI)
+
 ## Features
 
 - **Health Check**: Monitor application status
@@ -42,7 +44,13 @@ The project follows a clean architecture with separation of concerns:
 
 ## Installation
 
-1. **Clone or navigate to the project directory**
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/ilyasyoussefmouhri/SalesAnalyticsAPI.git
+   cd SalesAnalyticsAPI
+   ```
+
+   Or if you already have the project, navigate to the project directory
 
 2. **Create a virtual environment** (recommended):
    ```bash
@@ -259,6 +267,16 @@ Logs are written to both:
 - **File**: All logs are saved to `app.log` in the project root directory
 
 The log file (`app.log`) is automatically excluded from version control via `.gitignore`.
+
+## Repository
+
+This project is hosted on GitHub:
+- **Repository**: [SalesAnalyticsAPI](https://github.com/ilyasyoussefmouhri/SalesAnalyticsAPI)
+- **Issues**: [Report Issues](https://github.com/ilyasyoussefmouhri/SalesAnalyticsAPI/issues)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
