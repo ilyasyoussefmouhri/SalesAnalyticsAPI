@@ -25,6 +25,14 @@ app = FastAPI(
 )
 
 # CORS Middleware
+# IMPORTANT: CORS (Cross-Origin Resource Sharing) middleware is essential for:
+# 1. Security: Controls which origins can access the API, preventing unauthorized cross-origin requests
+# 2. Functionality: Enables frontend applications (React, Vue, Angular, etc.) to communicate with the API
+# 3. Browser compatibility: Browsers enforce CORS policies; without proper configuration, requests from
+#    different origins will be blocked, causing the application to fail
+# 
+# Configuration is loaded from settings (config.py) and can be customized via .env file
+# For production, ensure CORS_ORIGINS is set to specific allowed domains, not ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

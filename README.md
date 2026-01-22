@@ -242,7 +242,12 @@ You can test the API using the included `test_data.csv` file or use tools like:
 ## Security
 
 - **API Key Authentication**: All endpoints (except `/health`) require a valid API key in the `X-API-Key` header
-- **CORS**: Configured via environment variables
+- **CORS Configuration**: **CRITICAL** - CORS (Cross-Origin Resource Sharing) must be properly configured for security and functionality:
+  - **Security**: Prevents unauthorized cross-origin requests from accessing your API
+  - **Functionality**: Enables frontend applications to communicate with the API without browser blocking
+  - **Production**: Replace `["*"]` with specific allowed origins (e.g., `["https://yourdomain.com"]`) in production
+  - **Development**: `["*"]` is acceptable for development but poses security risks in production
+  - Configure via `.env` file using `CORS_ORIGINS`, `CORS_ALLOW_CREDENTIALS`, `CORS_ALLOW_METHODS`, and `CORS_ALLOW_HEADERS`
 - **Input Validation**: All uploaded files are validated before processing
 
 ## Configuration
@@ -253,7 +258,39 @@ All configuration is done through environment variables in the `.env` file:
 - `API_KEY_HEADER`: Header name for API key (default: X-API-Key)
 - `DEBUG`: Enable debug mode (default: False)
 - `LOG_LEVEL`: Logging level (default: INFO)
-- `CORS_ORIGINS`: Allowed CORS origins (default: ["*"])
+
+### CORS Configuration (Required for Security and Functionality)
+
+**IMPORTANT**: CORS configuration is essential for both security and application functionality. Without proper CORS settings:
+- Frontend applications cannot communicate with the API (browser will block requests)
+- Security vulnerabilities may arise from overly permissive CORS settings
+
+**CORS Environment Variables**:
+
+- `CORS_ORIGINS`: List of allowed origins for cross-origin requests
+  - **Development**: `["*"]` allows all origins (convenient but less secure)
+  - **Production**: Specify exact origins, e.g., `["https://yourdomain.com", "https://app.yourdomain.com"]`
+  - Example: `CORS_ORIGINS=["https://example.com", "https://app.example.com"]`
+
+- `CORS_ALLOW_CREDENTIALS`: Allow credentials (cookies, auth headers) in cross-origin requests
+  - Default: `True`
+  - Set to `False` if credentials are not needed
+
+- `CORS_ALLOW_METHODS`: Allowed HTTP methods for cross-origin requests
+  - Default: `["*"]` (allows all methods)
+  - Production example: `["GET", "POST", "PUT", "DELETE"]`
+
+- `CORS_ALLOW_HEADERS`: Allowed headers in cross-origin requests
+  - Default: `["*"]` (allows all headers)
+  - Production example: `["X-API-Key", "Content-Type", "Authorization"]`
+
+**Example Production CORS Configuration**:
+```bash
+CORS_ORIGINS=["https://yourdomain.com", "https://app.yourdomain.com"]
+CORS_ALLOW_CREDENTIALS=True
+CORS_ALLOW_METHODS=["GET", "POST"]
+CORS_ALLOW_HEADERS=["X-API-Key", "Content-Type"]
+```
 
 ## Logging
 
