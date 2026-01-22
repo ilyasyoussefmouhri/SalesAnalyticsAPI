@@ -65,9 +65,12 @@ The project follows a clean architecture with separation of concerns:
 
 4. **Set up environment variables**:
    
-   Create a `.env` file in the project root with the following content:
+   **IMPORTANT**: Create a `.env` file in the project root. The `API_KEY` is **REQUIRED** - the application will not start without it.
+   
+   Create a `.env` file with the following content:
    ```bash
-   # API Configuration
+   # API Configuration (REQUIRED)
+   # SECURITY: You MUST set a secure API key - no default is provided for security reasons
    API_KEY=your-secret-api-key-change-in-production
    API_KEY_HEADER=X-API-Key
    
@@ -76,7 +79,10 @@ The project follows a clean architecture with separation of concerns:
    APP_VERSION=1.0.0
    DEBUG=False
    
-   # CORS Settings
+   # CORS Settings (REQUIRED)
+   # SECURITY: CORS_ORIGINS defaults to empty [] - you MUST configure allowed origins
+   # For development: CORS_ORIGINS=["*"] (less secure, convenient for testing)
+   # For production: CORS_ORIGINS=["https://yourdomain.com"] (specify exact origins)
    CORS_ORIGINS=["*"]
    CORS_ALLOW_CREDENTIALS=True
    CORS_ALLOW_METHODS=["*"]
@@ -86,7 +92,11 @@ The project follows a clean architecture with separation of concerns:
    LOG_LEVEL=INFO
    ```
    
-   Make sure to update the `API_KEY` with your secret key.
+   **SECURITY NOTES**:
+   - `API_KEY` is **REQUIRED** - the application will fail to start if not provided
+   - `CORS_ORIGINS` defaults to `[]` (empty) - you MUST configure it explicitly
+   - For development, you can use `CORS_ORIGINS=["*"]` but this is insecure for production
+   - Generate a strong, random API key for production use
 
 ## Running the Application
 

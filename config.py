@@ -7,7 +7,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # API Configuration
-    api_key: str = "your-secret-api-key-change-in-production"
+    # SECURITY: API key must be set via environment variable
+    # No default value for security - application will fail to start if not provided
+    api_key: str  # Required - must be set in .env file
     api_key_header: str = "X-API-Key"
     
     # Application
@@ -19,11 +21,12 @@ class Settings(BaseSettings):
     # IMPORTANT: CORS (Cross-Origin Resource Sharing) must be properly configured
     # for security reasons and to ensure the application runs smoothly with frontend clients.
     # 
-    # Security considerations:
-    # - In production, replace ["*"] with specific allowed origins (e.g., ["https://yourdomain.com"])
-    # - Allowing "*" permits any origin, which is convenient for development but insecure for production
+    # SECURITY: Default is empty list [] - you MUST explicitly configure allowed origins
+    # - For development: Set CORS_ORIGINS=["*"] in .env (less secure, convenient for testing)
+    # - For production: Set specific origins (e.g., CORS_ORIGINS=["https://yourdomain.com"])
+    # - Allowing "*" permits any origin, which is insecure for production
     # - Proper CORS configuration prevents unauthorized cross-origin requests
-    cors_origins: List[str] = ["*"]
+    cors_origins: List[str] = []  # SECURITY: Empty by default - must be explicitly configured
     
     # Allow credentials (cookies, authorization headers) in cross-origin requests
     # Set to False if you don't need to send credentials
