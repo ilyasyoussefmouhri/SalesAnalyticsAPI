@@ -2,9 +2,10 @@
 import logging
 from datetime import datetime
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request
+from fastapi.security import APIKeyHeader
 from fastapi.responses import JSONResponse
 from config import settings
-from processing import read_csv_file, read_excel_file, validate_sales_data, calculate_sales_analytics
+from processing import validate_and_read_file, validate_sales_data, calculate_sales_analytics
 from schemas import (
     HealthResponse,
     QuickStatsResponse,
@@ -20,17 +21,18 @@ router = APIRouter()
 
 
 # API Key Authentication
-async def verify_api_key(request: Request):
+# API Key Authentication
+api_key_header = APIKeyHeader(name=settings.API_KEY_HEADER, auto_error=False)
+
+async def verify_api_key(api_key: str = Depends(api_key_header)):
     """Verify API key from request headers."""
-    api_key = request.headers.get(settings.api_key_header)
-    
     if not api_key:
         raise HTTPException(
             status_code=401,
             detail="API key missing. Please provide X-API-Key header."
         )
     
-    if api_key != settings.api_key:
+    if api_key != settings.API_KEY:
         raise HTTPException(
             status_code=403,
             detail="Invalid API key."
@@ -45,44 +47,20 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version=settings.app_version
+        version=settings.APP_VERSION
     )
 
 
 @router.post("/quick-stats", response_model=QuickStatsResponse)
 async def quick_stats(
     file: UploadFile = File(...),
-    api_key: str = Depends(verify_api_key)
+    _api_key: str = Depends(verify_api_key)
 ):
     """Get quick statistics about the uploaded file."""
     logger.info(f"Quick stats requested for file: {file.filename}")
     
-    # SECURITY: Validate file size before processing to prevent DoS attacks
-    if file.size and file.size > settings.max_file_size:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
-        )
-    
-    # Validate file type
-    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
-        raise HTTPException(
-            status_code=400,
-            detail="Only CSV and Excel files are supported"
-        )
-    
     try:
-        if file.filename.endswith('.csv'):
-            df = read_csv_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xlsx'):
-            df = read_excel_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xls'):
-            df = read_excel_file(file, settings.max_file_size)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Only CSV and Excel files are supported"
-            )
+        df = validate_and_read_file(file, settings.MAX_FILE_SIZE)
         
         return QuickStatsResponse(
             filename=file.filename,
@@ -106,37 +84,13 @@ async def quick_stats(
 @router.post("/validate", response_model=ValidateResponse)
 async def validate_data(
     file: UploadFile = File(...),
-    api_key: str = Depends(verify_api_key)
+    _api_key: str = Depends(verify_api_key)
 ):
     """Validate data quality of the uploaded sales file."""
     logger.info(f"Validation requested for file: {file.filename}")
     
-    # SECURITY: Validate file size before processing to prevent DoS attacks
-    if file.size and file.size > settings.max_file_size:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
-        )
-    
-    # Validate file type
-    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
-        raise HTTPException(
-            status_code=400,
-            detail="Only CSV and Excel files are supported"
-        )
-    
     try:
-        if file.filename.endswith('.csv'):
-            df = read_csv_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xlsx'):
-            df = read_excel_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xls'):
-            df = read_excel_file(file, settings.max_file_size)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Only CSV and Excel files are supported"
-            )
+        df = validate_and_read_file(file, settings.MAX_FILE_SIZE)
         validation_results = validate_sales_data(df)
         
         return ValidateResponse(
@@ -157,42 +111,18 @@ async def validate_data(
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_sales(
     file: UploadFile = File(...),
-    api_key: str = Depends(verify_api_key)
+    _api_key: str = Depends(verify_api_key)
 ):
     """Perform full sales analysis on the uploaded file."""
     logger.info(f"Full analysis requested for file: {file.filename}")
     
-    # SECURITY: Validate file size before processing to prevent DoS attacks
-    if file.size and file.size > settings.max_file_size:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)"
-        )
-    
-    # Validate file type
-    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
-        raise HTTPException(
-            status_code=400,
-            detail="Only CSV and Excel files are supported"
-        )
-    
     try:
-        if file.filename.endswith('.csv'):
-            df = read_csv_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xlsx'):
-            df = read_excel_file(file, settings.max_file_size)
-        elif file.filename.endswith('.xls'):
-            df = read_excel_file(file, settings.max_file_size)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Only CSV and Excel files are supported"
-            )
+        df = validate_and_read_file(file, settings.MAX_FILE_SIZE)
         
         # First validate the data
         validation_results = validate_sales_data(df)
         
-        if not validation_results["valid"]:
+        if not validation_results.valid:
             error_response = ErrorResponse(
                 error="Data validation failed",
                 validation=validation_results,

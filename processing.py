@@ -2,10 +2,79 @@
 import logging
 import pandas as pd
 from io import BytesIO
+from pathlib import Path
 from fastapi import UploadFile, HTTPException
-from schemas import DateRangeStats, SalesAnalytics, ValidationStats, ValidationResults
+from schemas import DateRangeStats, SalesAnalytics, ValidationStats, ValidationResults, TimeAnalysis, CustomerSegments, AnalyzeResponse, ErrorResponse
 
 logger = logging.getLogger(__name__)
+
+# Supported file extensions (case-insensitive)
+ALLOWED_EXTENSIONS = {'.csv', '.xlsx', '.xls'}
+
+
+def validate_and_read_file(file: UploadFile, max_size: int) -> pd.DataFrame:
+    """Validate file type and size, then read into DataFrame.
+    
+    This is a unified helper that handles:
+    - File extension validation (case-insensitive)
+    - File size validation
+    - Reading CSV and Excel files
+    
+    Args:
+        file: Uploaded file object
+        max_size: Maximum allowed file size in bytes
+        
+    Returns:
+        Parsed pandas DataFrame
+        
+    Raises:
+        HTTPException: If file type is unsupported, size exceeds limit, or reading fails
+    """
+    # Validate file extension (case-insensitive)
+    file_ext = Path(file.filename).suffix.lower() if file.filename else ''
+    
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{file_ext}'. Only CSV and Excel files are supported."
+        )
+    
+    # SECURITY: Validate file size before reading into memory to prevent DoS attacks
+    if file.size and file.size > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size ({file.size} bytes) exceeds maximum allowed size ({max_size} bytes)"
+        )
+    
+    try:
+        contents = file.file.read()
+        
+        # Additional check: validate actual content size (file.size might be None)
+        if len(contents) > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File size ({len(contents)} bytes) exceeds maximum allowed size ({max_size} bytes)"
+            )
+        
+        # Read based on file type
+        if file_ext == '.csv':
+            df = pd.read_csv(BytesIO(contents))
+        else:  # .xlsx or .xls
+            df = pd.read_excel(BytesIO(contents))
+        
+        logger.info(f"Successfully read file '{file.filename}' with {len(df)} rows")
+        return df
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reading file '{file.filename}': {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error reading file: {str(e)}"
+        )
+    finally:
+        file.file.seek(0)
 
 
 def read_csv_file(file: UploadFile, max_size: int) -> pd.DataFrame:
@@ -80,7 +149,7 @@ def read_excel_file(file: UploadFile, max_size: int) -> pd.DataFrame:
         df = pd.read_excel(BytesIO(contents))
         return df
     except HTTPException:
-        logger.error("Error reading Excel file")
+        logger.error("HTTPException")
         raise HTTPException(status_code=400, detail="Error reading Excel file")
     except Exception as e:
         logger.error(f"Error reading Excel file: {str(e)}")
@@ -104,9 +173,8 @@ def validate_sales_data(df: pd.DataFrame) -> ValidationResults:
         valid=True,
         errors=[],
         warnings=[],
-        stats=ValidationStats(total_rows=len(df), total_columns=len(df.columns), missing_values_total=0, duplicate_rows=0, date_range=None)
+        stats=ValidationStats(total_rows=len(df), total_columns=len(df.columns), missing_values_total=0, duplicate_rows=0, date_range=None),
         quality_score=100.0
-
     )
     
     # Required columns
@@ -358,6 +426,19 @@ def calculate_sales_analytics(df: pd.DataFrame) -> SalesAnalytics:
     Returns:
         SalesAnalytics model with comprehensive sales analytics
     """
+    # Create copy to avoid modifying original dataframe
+    df = df.copy()
+    
+    # Calculate revenue if not present or just to be safe (price * quantity)
+    # Ensure columns are numeric first
+    if "price" in df.columns and "quantity" in df.columns:
+        df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
+        df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0)
+        df["revenue"] = df["price"] * df["quantity"]
+    elif "revenue" not in df.columns:
+        # Fallback if we can't calculate and it's missing
+        df["revenue"] = 0.0
+
     # Top products by revenue
     top_products_revenue = (
         df.groupby("product")["revenue"]
@@ -383,23 +464,27 @@ def calculate_sales_analytics(df: pd.DataFrame) -> SalesAnalytics:
     if len(customer_revenue) > 0:
         high_value_threshold = customer_revenue.quantile(0.8)
         medium_value_threshold = customer_revenue.quantile(0.5)
-        
-        customer_segments = {
-            "high_value": customer_revenue[customer_revenue >= high_value_threshold].to_dict(),
-            "medium_value": customer_revenue[
-                (customer_revenue >= medium_value_threshold) & 
+        customer_segments = CustomerSegments(
+            high_value=customer_revenue[customer_revenue >= high_value_threshold].to_dict(),
+            medium_value=customer_revenue[
+                (customer_revenue >= medium_value_threshold) &
                 (customer_revenue < high_value_threshold)
-            ].to_dict(),
-            "low_value": customer_revenue[customer_revenue < medium_value_threshold].to_dict()
-        }
+                ].to_dict(),
+            low_value=customer_revenue[customer_revenue < medium_value_threshold].to_dict()
+        )
     else:
-        customer_segments = {"high_value": {}, "medium_value": {}, "low_value": {}}
+        customer_segments = CustomerSegments(
+            high_value={},
+            medium_value={},
+            low_value={}
+        )
     
     # Time-based analysis
-    time_analysis = {}
+    time_analysis = TimeAnalysis()
     if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df_with_dates = df.dropna(subset=["date"])
+        df_copy = df.copy() 
+        df_copy["date"] = pd.to_datetime(df_copy["date"], errors="coerce")
+        df_with_dates = df_copy.dropna(subset=["date"])
         
         if len(df_with_dates) > 0:
             # Daily revenue
@@ -408,7 +493,7 @@ def calculate_sales_analytics(df: pd.DataFrame) -> SalesAnalytics:
                 .sum()
                 .to_dict()
             )
-            time_analysis["daily_revenue"] = {str(k): float(v) for k, v in daily_revenue.items()}
+            time_analysis.daily_revenue = {str(k): float(v) for k, v in daily_revenue.items()}
             
             # Monthly revenue
             monthly_revenue = (
@@ -416,22 +501,22 @@ def calculate_sales_analytics(df: pd.DataFrame) -> SalesAnalytics:
                 .sum()
                 .to_dict()
             )
-            time_analysis["monthly_revenue"] = {str(k): float(v) for k, v in monthly_revenue.items()}
+            time_analysis.monthly_revenue = {str(k): float(v) for k, v in monthly_revenue.items()}
     
     total_revenue = df["revenue"].sum()
     total_quantity = df["quantity"].sum()
     avg_order_value = total_revenue / len(df)
-    return {
-        "total_revenue": float(total_revenue),
-        "total_quantity": float(total_quantity),
-        "total_orders": len(df),
-        "average_order_value": float(avg_order_value),
-        "top_products_by_revenue": {k: float(v) for k, v in top_products_revenue.items()},
-        "top_products_by_quantity": {k: float(v) for k, v in top_products_quantity.items()},
-        "customer_segments": {
-            "high_value": {k: float(v) for k, v in customer_segments["high_value"].items()},
-            "medium_value": {k: float(v) for k, v in customer_segments["medium_value"].items()},
-            "low_value": {k: float(v) for k, v in customer_segments["low_value"].items()}
-        },
-        "time_analysis": time_analysis
-    }
+
+    sales_analytics = SalesAnalytics(
+        total_revenue=total_revenue,
+        total_quantity=total_quantity,
+        total_orders=len(df),
+        average_order_value=avg_order_value,
+        top_products_by_revenue=top_products_revenue,
+        top_products_by_quantity=top_products_quantity,
+        customer_segments=customer_segments,
+        time_analysis=time_analysis
+    )
+
+
+    return sales_analytics
