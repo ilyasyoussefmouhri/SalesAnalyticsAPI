@@ -10,21 +10,30 @@ class HealthResponse(BaseModel):
     timestamp: str
     version: str
 
+class DateRangeStats(BaseModel):
+    """Statistics about date range in the data"""
+    min: str
+    max: str
+    span_days: int = Field(description="Number of days between min and max date")
 
 class ValidationStats(BaseModel):
-    """Validation statistics schema."""
-    total_rows: int
-    total_columns: int
-    columns: List[str]
-    date_range: Optional[Dict[str, Optional[str]]] = None
+    """Statistics about the validated data"""
+    total_rows: int = Field(description="Total rows in input data")
+    total_columns: int = Field(description="Total columns in input data")
+    missing_values_total: int = Field(description="Total missing values across all columns in input data")
+    duplicate_rows: int = Field(description="Number of duplicate rows in input data")
+    date_range: Optional[DateRangeStats] = Field(default=None, description="Date range if date column exists in input data")
 
 
-class ValidationResult(BaseModel):
-    """Data validation result schema."""
-    valid: bool
-    errors: List[str]
-    warnings: List[str]
+class ValidationResults(BaseModel):
+    """Complete validation results with quality score"""
+    valid: bool = Field(description="Whether data passes validation")
+    errors: list[str] = Field(default_factory=list, description="Critical errors that fail validation")
+    warnings: list[str] = Field(default_factory=list, description="Non-critical issues")
     stats: ValidationStats
+    quality_score: float = Field(ge=0, le=100, description="Overall data quality score (0-100)")
+
+
 
 
 class QuickStatsResponse(BaseModel):

@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from config import settings
-from processing import read_csv_file, validate_sales_data, calculate_sales_analytics
+from processing import read_csv_file, read_excel_file, validate_sales_data, calculate_sales_analytics
 from schemas import (
     HealthResponse,
     QuickStatsResponse,
@@ -65,14 +65,24 @@ async def quick_stats(
         )
     
     # Validate file type
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
         raise HTTPException(
             status_code=400,
-            detail="Only CSV files are supported"
+            detail="Only CSV and Excel files are supported"
         )
     
     try:
-        df = read_csv_file(file, settings.max_file_size)
+        if file.filename.endswith('.csv'):
+            df = read_csv_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xlsx'):
+            df = read_excel_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xls'):
+            df = read_excel_file(file, settings.max_file_size)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Only CSV and Excel files are supported"
+            )
         
         return QuickStatsResponse(
             filename=file.filename,
@@ -109,14 +119,24 @@ async def validate_data(
         )
     
     # Validate file type
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
         raise HTTPException(
             status_code=400,
-            detail="Only CSV files are supported"
+            detail="Only CSV and Excel files are supported"
         )
     
     try:
-        df = read_csv_file(file, settings.max_file_size)
+        if file.filename.endswith('.csv'):
+            df = read_csv_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xlsx'):
+            df = read_excel_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xls'):
+            df = read_excel_file(file, settings.max_file_size)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Only CSV and Excel files are supported"
+            )
         validation_results = validate_sales_data(df)
         
         return ValidateResponse(
@@ -150,14 +170,24 @@ async def analyze_sales(
         )
     
     # Validate file type
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith('.csv') and not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls'):
         raise HTTPException(
             status_code=400,
-            detail="Only CSV files are supported"
+            detail="Only CSV and Excel files are supported"
         )
     
     try:
-        df = read_csv_file(file, settings.max_file_size)
+        if file.filename.endswith('.csv'):
+            df = read_csv_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xlsx'):
+            df = read_excel_file(file, settings.max_file_size)
+        elif file.filename.endswith('.xls'):
+            df = read_excel_file(file, settings.max_file_size)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Only CSV and Excel files are supported"
+            )
         
         # First validate the data
         validation_results = validate_sales_data(df)
